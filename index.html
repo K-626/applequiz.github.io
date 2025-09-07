@@ -139,7 +139,7 @@
       scores[turn].correct++;
       updateScores();
       turn = null;
-      setTimeout(() => nextQuestion, 500);
+      setTimeout(() => nextQuestion(), 500);
     }
 
     // 不正解
@@ -148,7 +148,7 @@
       scores[turn].wrong++;
       updateScores();
       turn = null;
-      setTimeout(() => nextQuestion, 500);
+      setTimeout(() => nextQuestion(), 500);
     }
 
     // スコア表示更新
