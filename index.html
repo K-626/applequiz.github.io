@@ -10,7 +10,7 @@
     .question-box, .answer-box { width: 100%; margin: 10px 0; }
     .controls, .scores { margin: 15px 0; }
     button { margin: 5px; padding: 8px 16px; font-size: 16px; }
-    .scores span { display: inline-block; width: 120px; }
+    .scores span { display: inline-block; width: 140px; }
   </style>
 </head>
 <body>
@@ -25,13 +25,20 @@
     <input type="text" id="sheetUrl" placeholder="スプレッドシートのCSV URLを入力" style="width:70%">
     <button onclick="loadFromSpreadsheet(document.getElementById('sheetUrl').value)">スプレッドシートから読み込む</button>
   </div>
+  <label>
+    <input type="checkbox" id="comCheckbox" onchange="toggleCOM()"> COM
+  </label>
+  <br><br>
 
   <!-- 問題と回答表示 -->
   <div>
     <textarea id="questionBox" class="question-box" rows="4" readonly></textarea>
     <textarea id="answerBox" class="answer-box" rows="2" readonly></textarea>
   </div>
-
+  <div>
+  <label>COMの解答結果</label><br>
+  <textarea id="comResultBox" rows="1" cols="50" readonly></textarea>
+  </div>
   <!-- コントロール -->
   <div class="controls">
     <button onclick="nextQuestion()">出題</button>
@@ -49,19 +56,32 @@
     <span>A 正解: <span id="aCorrect">0</span></span>
     <span>A 不正解: <span id="aWrong">0</span></span><br>
     <span>B 正解: <span id="bCorrect">0</span></span>
-    <span>B 不正解: <span id="bWrong">0</span></span>
+    <span>B 不正解: <span id="bWrong">0</span></span><br>
+    <span>COM 正解: <span id="comCorrect">0</span></span>
+    <span>COM 不正解: <span id="comWrong">0</span></span>
   </div>
 
   <!-- ライブラリ -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
   <script>
-    let questions = []; // {q, a} の配列
+    let questions = [];
     let currentIndex = -1;
-    let turn = null; // "A" または "B"
-    let scores = { A: { correct: 0, wrong: 0 }, B: { correct: 0, wrong: 0 } };
-    let typingTimer = null; // タイピング制御用
-    let typingStopped = false; // 途中で止めたかどうか
+    let turn = null;
+    let scores = { 
+      A: { correct: 0, wrong: 0 }, 
+      B: { correct: 0, wrong: 0 },
+      COM: { correct: 0, wrong: 0 }
+    };
+    let typingTimer = null;
+    let typingStopped = false;
+    let comTimer = null;
+    let isCOM = false;
+    let scoreCOM = { correct: 0, wrong: 0 };
+
+    function toggleCOM() {
+      isCOM = document.getElementById("comCheckbox").checked;
+    }
 
     // Excel読み込み
     function uploadExcel() {
@@ -97,16 +117,46 @@
       if (questions.length === 0) { alert("問題が読み込まれていません"); return; }
       currentIndex++;
       if (currentIndex >= questions.length) { alert("すべての問題が終了しました"); return; }
+      
       document.getElementById("questionBox").value = "";
       document.getElementById("answerBox").value = "";
+      document.getElementById("comResultBox").value = ""; // 👈 ここでリセット！
+      
       turn = null;
       typingStopped = false;
       typeWriter(questions[currentIndex].q, "questionBox", 0);
+
+      // もしCOMがONなら、タイマーセット
+      if (isCOM) {
+        const qLength = questions[currentIndex].q.length;
+        const displayTime = qLength * 100;
+        const rand1 = Math.random();
+        if (rand1 >= 0.2) { // 0.2未満ならスキップ
+          const randomDelay = Math.floor(displayTime * rand1);
+          comTimer = setTimeout(() => {
+            if (!turn && currentIndex >= 0) {
+              buzz("B");
+              const rand2 = Math.random();
+              const sum = rand1 + rand2;
+              setTimeout(() => {
+                if (sum > 0.5) {
+                  document.getElementById("comResultBox").value = "COM: 正解！";
+                  updateScore("COM", true);
+                } else {
+                  document.getElementById("comResultBox").value = "COM: 不正解…";
+                  updateScore("COM", false);
+                }
+              }, 1000);
+            }
+          }, randomDelay);
+        }
+      }
     }
 
-    // タイピング風に表示（スピードを遅めに: 100ms）
+
+    // タイピング風表示
     function typeWriter(text, elementId, i) {
-      if (typingStopped) return; // 止められていたら終了
+      if (typingStopped) return;
       if (i < text.length) {
         document.getElementById(elementId).value += text.charAt(i);
         typingTimer = setTimeout(() => typeWriter(text, elementId, i+1), 100);
@@ -117,8 +167,9 @@
     function buzz(player) {
       if (!turn) {
         turn = player;
-        typingStopped = true; // タイピングを停止
+        typingStopped = true;
         clearTimeout(typingTimer);
+        clearTimeout(comTimer);
         document.getElementById("questionBox").value += `/`;
       }
     }
@@ -126,9 +177,7 @@
     // 答え表示
     function showAnswer() {
       if (currentIndex >= 0) {
-        // 答えを表示
         document.getElementById("answerBox").value = questions[currentIndex].a;
-        // 残りの問題文を強制表示
         document.getElementById("questionBox").value = questions[currentIndex].q;
       }
     }
@@ -152,19 +201,28 @@
     }
 
     // スコア表示更新
-    function updateScores() {
-      document.getElementById("aCorrect").innerText = scores.A.correct;
-      document.getElementById("aWrong").innerText = scores.A.wrong;
-      document.getElementById("bCorrect").innerText = scores.B.correct;
-      document.getElementById("bWrong").innerText = scores.B.wrong;
+    function updateScore(player, isCorrect) {
+      if (player === "A") {
+        if (isCorrect) scoreA.correct++; else scoreA.wrong++;
+        document.getElementById("aCorrect").innerText = scoreA.correct;
+        document.getElementById("aWrong").innerText = scoreA.wrong;
+      } else if (player === "B") {
+        if (isCorrect) scoreB.correct++; else scoreB.wrong++;
+        document.getElementById("bCorrect").innerText = scoreB.correct;
+        document.getElementById("bWrong").innerText = scoreB.wrong;
+      } else if (player === "COM") { // 👈 追加
+        if (isCorrect) scoreCOM.correct++; else scoreCOM.wrong++;
+        document.getElementById("comCorrect").innerText = scoreCOM.correct;
+        document.getElementById("comWrong").innerText = scoreCOM.wrong;
+      }
     }
+
 
     // スコアリセット
     function resetScores() {
-      scores = { A: { correct: 0, wrong: 0 }, B: { correct: 0, wrong: 0 } };
+      scores = { A: { correct: 0, wrong: 0 }, B: { correct: 0, wrong: 0 }, COM: { correct: 0, wrong: 0 } };
       updateScores();
     }
   </script>
 </body>
 </html>
-
