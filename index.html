@@ -86,17 +86,48 @@
     // Excel読み込み
     function uploadExcel() {
       const file = document.getElementById("excelUpload").files[0];
-      if (!file) { alert("ファイルを選択してください"); return; }
-      const reader = new FileReader();
-      reader.onload = function(e) {
-        const data = new Uint8Array(e.target.result);
-        const workbook = XLSX.read(data, {type: 'array'});
-        const sheet = workbook.Sheets[workbook.SheetNames[0]];
-        const rows = XLSX.utils.sheet_to_json(sheet, {header:1});
-        questions = rows.slice(1).map(r => ({q: r[0], a: r[1]}));
-        alert("Excelから問題を読み込みました！");
-      };
-      reader.readAsArrayBuffer(file);
+      if (!file) { 
+        alert("ファイルを選択してください"); 
+        return; 
+      }
+      const fileName = file.name.toLowerCase();
+
+      if (fileName.endsWith(".xlsx")) {
+        // ---- Excel ----
+        const reader = new FileReader();
+        reader.onload = function(e) {
+          const data = new Uint8Array(e.target.result);
+          const workbook = XLSX.read(data, {type: 'array'});
+          const sheet = workbook.Sheets[workbook.SheetNames[0]];
+          const rows = XLSX.utils.sheet_to_json(sheet, {header:1});
+          questions = rows.slice(1).map(r => ({q: r[0], a: r[1]}));
+          alert("Excelから問題を読み込みました！");
+        };
+        reader.readAsArrayBuffer(file);
+
+      } else if (fileName.endsWith(".csv") || fileName.endsWith(".tsv")) {
+        // ---- CSV/TSV ----
+        const reader = new FileReader();
+        reader.onload = function(e) {
+          const text = e.target.result.trim();
+
+          // 区切り文字を自動判定
+          let delimiter = ",";
+          if (text.includes("\t")) {
+            delimiter = "\t";
+          } else if (text.includes(";")) {
+            delimiter = ";";
+          }
+
+          const rows = text.split("\n").map(line => line.split(delimiter));
+          questions = rows.slice(1).map(r => ({q: r[0], a: r[1]}));
+          alert(`CSV (${delimiter === "\t" ? "TSV" : "カンマ/セミコロン区切り"}) から問題を読み込みました！`);
+        };
+        reader.readAsText(file);
+
+      } else {
+        alert("対応している形式は .xlsx / .csv / .tsv です");
+      }
     }
 
     // スプレッドシートCSV読み込み
