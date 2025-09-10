@@ -86,59 +86,51 @@
     // Excel読み込み
     function uploadExcel() {
       const file = document.getElementById("excelUpload").files[0];
-      if (!file) { 
-        alert("ファイルを選択してください"); 
-        return; 
-      }
-      const fileName = file.name.toLowerCase();
-
-      if (fileName.endsWith(".xlsx")) {
-        // ---- Excel ----
-        const reader = new FileReader();
-        reader.onload = function(e) {
-          const data = new Uint8Array(e.target.result);
-          const workbook = XLSX.read(data, {type: 'array'});
-          const sheet = workbook.Sheets[workbook.SheetNames[0]];
-          const rows = XLSX.utils.sheet_to_json(sheet, {header:1});
-          questions = rows.slice(1).map(r => ({q: r[0], a: r[1]}));
-          alert("Excelから問題を読み込みました！");
-        };
-        reader.readAsArrayBuffer(file);
-
-      } else if (fileName.endsWith(".csv") || fileName.endsWith(".tsv")) {
-        // ---- CSV/TSV ----
-        const reader = new FileReader();
-        reader.onload = function(e) {
-          const text = e.target.result.trim();
-
-          // 区切り文字を自動判定
-          let delimiter = ",";
-          if (text.includes("\t")) {
-            delimiter = "\t";
-          } else if (text.includes(";")) {
-            delimiter = ";";
-          }
-
-          const rows = text.split("\n").map(line => line.split(delimiter));
-          questions = rows.slice(1).map(r => ({q: r[0], a: r[1]}));
-          alert(`CSV (${delimiter === "\t" ? "TSV" : "カンマ/セミコロン区切り"}) から問題を読み込みました！`);
-        };
-        reader.readAsText(file);
-
-      } else {
-        alert("対応している形式は .xlsx / .csv / .tsv です");
-      }
+      if (!file) { alert("ファイルを選択してください"); return; }
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        const data = new Uint8Array(e.target.result);
+        const workbook = XLSX.read(data, {type: 'array'});
+        const sheet = workbook.Sheets[workbook.SheetNames[0]];
+        const rows = XLSX.utils.sheet_to_json(sheet, {header:1});
+        questions = rows.slice(1).map(r => ({q: r[0], a: r[1]}));
+        alert("Excelから問題を読み込みました！");
+      };
+      reader.readAsArrayBuffer(file);
     }
 
     // スプレッドシートCSV読み込み
     async function loadFromSpreadsheet(url) {
       try {
-        const response = await fetch(url);
+        // シートID抽出
+        const match = url.match(/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
+        if (!match) {
+          alert("有効なスプレッドシートURLを入力してください");
+          return;
+        }
+        const sheetId = match[1];
+
+        // gid からシート名を取得するのは難しいので、とりあえず最初のシートを読み込む
+        // Google Sheets CSVエクスポートURL
+        const csvUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:csv`;
+
+        const response = await fetch(csvUrl);
         const text = await response.text();
-        const rows = text.trim().split("\n").map(line => line.split(","));
+
+        // 区切り文字を自動判定
+        let delimiter = ",";
+        if (text.includes("\t")) {
+          delimiter = "\t";
+        } else if (text.includes(";")) {
+          delimiter = ";";
+        }
+
+        const rows = text.trim().split("\n").map(line => line.split(delimiter));
         questions = rows.slice(1).map(r => ({q: r[0], a: r[1]}));
-        alert("スプレッドシートから読み込みました！");
+        alert("スプレッドシートから問題を読み込みました！");
+
       } catch (e) {
+        console.error(e);
         alert("スプレッドシートの読み込みに失敗しました");
       }
     }
@@ -148,42 +140,50 @@
       if (questions.length === 0) { alert("問題が読み込まれていません"); return; }
       currentIndex++;
       if (currentIndex >= questions.length) { alert("すべての問題が終了しました"); return; }
-      
       document.getElementById("questionBox").value = "";
       document.getElementById("answerBox").value = "";
-      document.getElementById("comResultBox").value = ""; // 👈 ここでリセット！
-      
       turn = null;
       typingStopped = false;
+      clearTimeout(comTimer);
       typeWriter(questions[currentIndex].q, "questionBox", 0);
 
-      // もしCOMがONなら、タイマーセット
+      // COMが有効ならランダム時間でBが押す
+      // COMが有効ならランダム時間でBが押す
       if (isCOM) {
         const qLength = questions[currentIndex].q.length;
-        const displayTime = qLength * 100;
-        const rand1 = Math.random();
-        if (rand1 >= 0.2) { // 0.2未満ならスキップ
+        const displayTime = qLength * 100; // 全文表示にかかる時間
+
+        const rand1 = Math.random(); // 押す確率・タイミング
+        if (rand1 < 0.2) {
+          console.log("COMはこの問題では押しません");
+        } else {
           const randomDelay = Math.floor(displayTime * rand1);
+          console.log(`COMの予定時間: ${randomDelay/1000}秒後`);
+
           comTimer = setTimeout(() => {
             if (!turn && currentIndex >= 0) {
               buzz("B");
-              const rand2 = Math.random();
+
+              const rand2 = Math.random(); // 判定用乱数
               const sum = rand1 + rand2;
+              console.log(`COM判定用: rand1=${rand1}, rand2=${rand2}, sum=${sum}`);
+
               setTimeout(() => {
                 if (sum > 0.5) {
                   document.getElementById("comResultBox").value = "COM: 正解！";
-                  updateScore("COM", true);
+                  updateScore("COM", true);   // 👈 スコア反映
                 } else {
                   document.getElementById("comResultBox").value = "COM: 不正解…";
-                  updateScore("COM", false);
+                  updateScore("COM", false);  // 👈 スコア反映
                 }
               }, 1000);
             }
           }, randomDelay);
+
         }
       }
-    }
 
+    }
 
     // タイピング風表示
     function typeWriter(text, elementId, i) {
