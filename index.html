@@ -22,13 +22,13 @@
     <input type="file" id="excelUpload" accept=".xlsx" />
     <button onclick="uploadExcel()">Excelから読み込む</button>
     <br><br>
-    <input type="text" id="sheetUrl" placeholder="スプレッドシートのCSV URLを入力" style="width:70%">
-    <button onclick="loadFromSpreadsheet(document.getElementById('sheetUrl').value)">スプレッドシートから読み込む</button>
   </div>
   <label>
     <input type="checkbox" id="comCheckbox" onchange="toggleCOM()"> COM
   </label>
-  <br><br>
+  <div>
+  <label><input type="checkbox" id="randomMode"> random</label>
+  </div>
 
   <!-- 問題と回答表示 -->
   <div>
@@ -39,6 +39,11 @@
   <label>COMの解答結果</label><br>
   <textarea id="comResultBox" rows="1" cols="50" readonly></textarea>
   </div>
+    <div>
+    <label>誰が押したか</label><br>
+    <textarea id="buzzResultBox" rows="2" cols="50" readonly></textarea>
+  </div>
+
   <!-- コントロール -->
   <div class="controls">
     <button onclick="nextQuestion()">出題</button>
@@ -135,54 +140,76 @@
       }
     }
 
-    // 出題
+let usedIndices = []; // 出題済みのインデックス記録
+
     function nextQuestion() {
-      if (questions.length === 0) { alert("問題が読み込まれていません"); return; }
-      currentIndex++;
-      if (currentIndex >= questions.length) { alert("すべての問題が終了しました"); return; }
+      if (questions.length === 0) { 
+        alert("問題が読み込まれていません"); 
+        return; 
+      }
+
+      const randomMode = document.getElementById("randomMode").checked;
+
+      if (randomMode) {
+        // ランダムモード
+        if (usedIndices.length >= questions.length) {
+          alert("すべての問題が終了しました");
+          return;
+        }
+        let idx;
+        do {
+          idx = Math.floor(Math.random() * questions.length);
+        } while (usedIndices.includes(idx));
+        usedIndices.push(idx);
+        currentIndex = idx;
+      } else {
+        // 通常モード
+        currentIndex++;
+        if (currentIndex >= questions.length) {
+          alert("すべての問題が終了しました");
+          return;
+        }
+      }
+
+      // 出題処理（共通部分）
       document.getElementById("questionBox").value = "";
       document.getElementById("answerBox").value = "";
+      document.getElementById("comResultBox").value = "";
+      document.getElementById("buzzResultBox").value = "";
       turn = null;
       typingStopped = false;
       clearTimeout(comTimer);
       typeWriter(questions[currentIndex].q, "questionBox", 0);
 
-      // COMが有効ならランダム時間でBが押す
-      // COMが有効ならランダム時間でBが押す
+      // COM処理はそのまま
       if (isCOM) {
         const qLength = questions[currentIndex].q.length;
-        const displayTime = qLength * 100; // 全文表示にかかる時間
-
-        const rand1 = Math.random(); // 押す確率・タイミング
+        const displayTime = qLength * 100;
+        const rand1 = Math.random();
         if (rand1 < 0.2) {
           console.log("COMはこの問題では押しません");
         } else {
           const randomDelay = Math.floor(displayTime * rand1);
-          console.log(`COMの予定時間: ${randomDelay/1000}秒後`);
-
           comTimer = setTimeout(() => {
             if (!turn && currentIndex >= 0) {
-              buzz("B");
-
-              const rand2 = Math.random(); // 判定用乱数
+              buzz("COM");
+              const rand2 = Math.random();
               const sum = rand1 + rand2;
-              console.log(`COM判定用: rand1=${rand1}, rand2=${rand2}, sum=${sum}`);
-
               setTimeout(() => {
                 if (sum > 0.5) {
                   document.getElementById("comResultBox").value = "COM: 正解！";
-                  updateScore("COM", true);   // 👈 スコア反映
+                  showAnswer();
+                  updateScore("COM", true);
                 } else {
                   document.getElementById("comResultBox").value = "COM: 不正解…";
-                  updateScore("COM", false);  // 👈 スコア反映
+                  showAnswer();
+                  updateScore("COM", false);
                 }
               }, 1000);
             }
           }, randomDelay);
-
         }
       }
-
     }
 
     // タイピング風表示
@@ -195,6 +222,7 @@
     }
 
     // 早押し
+    // 早押し
     function buzz(player) {
       if (!turn) {
         turn = player;
@@ -202,8 +230,12 @@
         clearTimeout(typingTimer);
         clearTimeout(comTimer);
         document.getElementById("questionBox").value += `/`;
+
+        // 押した人を表示
+        document.getElementById("buzzResultBox").value = player + " が押しました！";
       }
     }
+
 
     // 答え表示
     function showAnswer() {
@@ -254,6 +286,32 @@
       scores = { A: { correct: 0, wrong: 0 }, B: { correct: 0, wrong: 0 }, COM: { correct: 0, wrong: 0 } };
       updateScores();
     }
+    document.addEventListener("keydown", (e) => {
+  switch (e.key) {
+    case "q": // 出題
+      nextQuestion();
+      break;
+    case "f": // A早押し
+      buzz("A");
+      break;
+    case "j": // B早押し
+      buzz("B");
+      break;
+    case "a": // 答え表示
+      showAnswer();
+      break;
+    case "z": // 正解
+      markCorrect();
+      break;
+    case "x": // 不正解
+      markWrong();
+      break;
+    case "r": // スコアリセット
+      resetScores();
+      break;
+  }
+});
+
   </script>
 </body>
 </html>
