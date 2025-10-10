@@ -50,12 +50,46 @@
       font-weight: bold;         /* 太字 */
         
     }
+    .mobile-control {
+      position: fixed;
+      bottom: 18px;
+      z-index: 1050;
+      display: none;
+      width: 100px;
+      height: 100px;
+      border-radius: 50%;
+      font-size: 1.3rem;
+      font-weight: bold;
+      border: none;
+      color: white;
+      box-shadow: 0 6px 18px rgba(0,0,0,0.18); 
+      transition: transform 0.1s, filter 0.1s;
+    }
+    .mobile-left {
+      left: 12%;
+      background-color: #28a745; /* 緑：出題 */
+    }
+    .mobile-center {
+      left: 50%;
+      transform: translateX(-50%);
+      background-color: #50e0a0; /* Aボタン（あなたの指定色） */
+    }
+    .mobile-right {
+      right: 12%;
+      background-color: #007bff; /* 青：答表示 */
+    }
+
    
 
     /* 小さい画面向けに少し大きめのタップ領域 */
-    @media (max-width: 480px) {
-      .mobile-buzzer { padding: 0.9rem 2.6rem; font-size: 1.35rem; bottom: 16px; }
+   @media (max-width: 480px) {
+    .mobile-buzzer,
+    .mobile-control {
+      width: 110px;
+      height: 110px;
+      font-size: 1.4rem;
     }
+  }
   </style>
 </head>
 <body>
@@ -150,8 +184,12 @@
     </div>
   </div>
 
-  <!-- モバイル用の大きなAボタン（JSで表示制御） -->
-  <button id="mobileBuzzer" class="mobile-buzzer" onclick="buzz('A')" aria-label="A早押しボタン"></button>
+<!-- モバイル用 丸い出題＆答え表示ボタン -->
+   <button id="mobileNextBtn" class="mobile-control mobile-left" onclick="nextQuestion()">出題</button>
+   <button id="mobileAnswerBtn" class="mobile-control mobile-right" onclick="showAnswer()">答表示</button>
+
+<!-- 既存のA早押しボタン -->
+   <button id="mobileBuzzer" class="mobile-buzzer mobile-center" onclick="buzz('A')" aria-label="A早押しボタン">A</button>
 
   <!-- ライブラリ -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -304,14 +342,16 @@
     // --- モバイル早押しの表示制御 ---
     function toggleMobileBuzzerVisibility() {
       const cb = document.getElementById("mobileBuzzerCheckbox");
-      const btn = document.getElementById("mobileBuzzer");
-      // 表示条件: チェックがON かつ（画面幅がスマホ想定以下）
-      if (cb.checked && window.innerWidth <= 768) {
-        btn.style.display = "block";
-      } else {
-        btn.style.display = "none";
-      }
+      const buzzerBtn = document.getElementById("mobileBuzzer");
+      const nextBtn = document.getElementById("mobileNextBtn");
+      const answerBtn = document.getElementById("mobileAnswerBtn");
+  
+      const show = cb.checked && window.innerWidth <= 768;
+      [buzzerBtn, nextBtn, answerBtn].forEach(btn => {
+        btn.style.display = show ? "block" : "none";
+      });
     }
+
 
     // 画面リサイズ時にも表示状態を切り替える
     window.addEventListener("resize", toggleMobileBuzzerVisibility);
