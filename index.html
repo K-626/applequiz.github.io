@@ -2,96 +2,179 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <title>Quiz </title>
+  <title>Quiz Game</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!-- Bootstrap CSS -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+
   <style>
-    body { font-family: Arial, sans-serif; margin: 20px; }
-    h1 { text-align: center; }
-    textarea, input { font-size: 16px; }
-    .question-box, .answer-box { width: 100%; margin: 10px 0; }
-    .controls, .scores { margin: 15px 0; }
-    button { margin: 5px; padding: 8px 16px; font-size: 16px; }
-    .scores span { display: inline-block; width: 140px; }
+    body {
+      font-family: "Segoe UI", Arial, sans-serif;
+      background-color: #f8f9fa;
+      padding-top: 40px;
+    }
+    textarea {
+      resize: none;
+    }
+    .question-box, .answer-box {
+      font-size: 1.1rem;
+      font-family: monospace;
+    }
+    .card {
+      border-radius: 1rem;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+    }
+    .scores span {
+      display: inline-block;
+      min-width: 150px;
+    }
+
+    /* モバイル用大きな早押しボタン */
+    .mobile-buzzer {
+      position: fixed;
+      bottom: 18px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 1050;
+      display: none; /* JSで表示制御 */
+      padding: 0.7rem 2.2rem;
+      font-size: 1.25rem;
+      box-shadow: 0 6px 18px rgba(0,0,0,0.18);
+      border-radius: 30%;
+      width: 120px;              /* 横幅（例：120px） */
+      height: 120px;             /* 縦幅（例：120px） */
+      background-color: #1b4ac2; /* 背景色（例：赤） */
+      color: white;              /* 文字色 */
+      border: none;              /* 枠線なし */
+      font-size: 1.5rem;         /* 文字の大きさ */
+      font-weight: bold;         /* 太字 */
+        
+    }
+   
+
+    /* 小さい画面向けに少し大きめのタップ領域 */
+    @media (max-width: 480px) {
+      .mobile-buzzer { padding: 0.9rem 2.6rem; font-size: 1.35rem; bottom: 16px; }
+    }
   </style>
 </head>
 <body>
-  <h1>Quiz Game</h1>
 
-  <!-- データ読み込み -->
-  <div>
-    <h3>問題データの読み込み</h3>
-    <input type="file" id="excelUpload" accept=".xlsx" />
-    <button onclick="uploadExcel()">Excelから読み込む</button>
-    <br><br>
-  </div>
-  <label>
-    <input type="checkbox" id="comCheckbox" onchange="toggleCOM()"> COM
-  </label>
-  <div>
-  <label><input type="checkbox" id="randomMode"> random</label>
+  <div class="container">
+    <h1 class="text-center mb-4 fw-bold">Quiz Game</h1>
+
+    <!-- データ読み込み -->
+    <div class="card p-4 mb-4">
+      <h4 class="mb-3">問題データの読み込み</h4>
+
+      <!-- ファイル選択とボタンを横並び -->
+      <div class="input-group mb-2">
+        <input type="file" class="form-control" id="excelUpload" accept=".xlsx">
+        <button class="btn btn-sm btn-primary" onclick="uploadExcel()">Excelから読み込む</button>
+      </div>
+
+      
+      <div class="form-check form-switch mt-2">
+        <input class="form-check-input" type="checkbox" id="comCheckbox" onchange="toggleCOM()">
+        <label class="form-check-label" for="comCheckbox">COM 対戦</label>
+      </div>
+      <div class="form-check form-switch mt-2">
+        <input class="form-check-input" type="checkbox" id="randomMode">
+        <label class="form-check-label" for="randomMode">ランダム出題</label>
+      </div>
+
+      <!-- モバイル早押しの切り替え -->
+      <div class="form-check form-switch mt-2">
+        <input class="form-check-input" type="checkbox" id="mobileBuzzerCheckbox" onchange="toggleMobileBuzzerVisibility()">
+        <label class="form-check-label" for="mobileBuzzerCheckbox">ボタン</label>
+      </div>
+    </div>
+
+    <!-- 問題と回答 -->
+    <div class="card p-4 mb-4">
+      <div class="mb-3">
+        <label class="form-label fw-bold">問題</label>
+        <textarea id="questionBox" class="form-control question-box" rows="4" readonly></textarea>
+      </div>
+      <div class="mb-3">
+        <label class="form-label fw-bold">答え</label>
+        <textarea id="answerBox" class="form-control answer-box" rows="2" readonly></textarea>
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label fw-bold">COMの解答結果</label>
+        <textarea id="comResultBox" class="form-control" rows="1" readonly></textarea>
+      </div>
+      <div class="mb-3">
+        <label class="form-label fw-bold">誰が押したか</label>
+        <textarea id="buzzResultBox" class="form-control" rows="2" readonly></textarea>
+      </div>
+    </div>
+
+    <!-- コントロール -->
+    <div class="card p-4 mb-4 text-center">
+      <div class="d-flex flex-wrap justify-content-center gap-2">
+        <button class="btn btn-success" onclick="nextQuestion()">出題</button>
+        <button class="btn btn-outline-primary" onclick="buzz('A')">A 早押し</button>
+        <button class="btn btn-outline-warning" onclick="buzz('B')">B 早押し</button>
+        <button class="btn btn-info" onclick="showAnswer()">答え表示</button>
+        <button class="btn btn-success" onclick="markCorrect()">正解</button>
+        <button class="btn btn-danger" onclick="markWrong()">不正解</button>
+        <button class="btn btn-info" onclick="resetScores()">スコアリセット</button>
+      </div>
+      <div class="text-muted mt-3 small">
+        <kbd>Q</kbd> 出題 ／ <kbd>F</kbd> A押し ／ <kbd>J</kbd> B押し ／ <kbd>A</kbd> 答え表示 ／ <kbd>Z</kbd> 正解 ／ <kbd>X</kbd> 不正解 ／ <kbd>R</kbd> リセット
+      </div>
+    </div>
+
+    <!-- スコア表示 -->
+    <div class="card p-4 mb-4">
+      <h4 class="mb-3">スコア</h4>
+      <div class="row">
+        <div class="col-md-4 mb-2">
+          <h5>Aプレイヤー</h5>
+          <span>正解: <span id="aCorrect">0</span></span><br>
+          <span>不正解: <span id="aWrong">0</span></span>
+        </div>
+        <div class="col-md-4 mb-2">
+          <h5>Bプレイヤー</h5>
+          <span>正解: <span id="bCorrect">0</span></span><br>
+          <span>不正解: <span id="bWrong">0</span></span>
+        </div>
+        <div class="col-md-4 mb-2">
+          <h5>COM</h5>
+          <span>正解: <span id="comCorrect">0</span></span><br>
+          <span>不正解: <span id="comWrong">0</span></span>
+        </div>
+      </div>
+    </div>
   </div>
 
-  <!-- 問題と回答表示 -->
-  <div>
-    <textarea id="questionBox" class="question-box" rows="4" readonly></textarea>
-    <textarea id="answerBox" class="answer-box" rows="2" readonly></textarea>
-  </div>
-  <div>
-  <label>COMの解答結果</label><br>
-  <textarea id="comResultBox" rows="1" cols="50" readonly></textarea>
-  </div>
-    <div>
-    <label>誰が押したか</label><br>
-    <textarea id="buzzResultBox" rows="2" cols="50" readonly></textarea>
-  </div>
-
-  <!-- コントロール -->
-  <div class="controls">
-    <button onclick="nextQuestion()">出題</button>
-    <button onclick="buzz('A')">A早押し</button>
-    <button onclick="buzz('B')">B早押し</button>
-    <button onclick="showAnswer()">答え表示</button>
-    <button onclick="markCorrect()">正解</button>
-    <button onclick="markWrong()">不正解</button>
-    <button onclick="resetScores()">スコアリセット</button>
-  </div>
-
-  <!-- スコア表示 -->
-  <div class="scores">
-    <h3>スコア</h3>
-    <span>A 正解: <span id="aCorrect">0</span></span>
-    <span>A 不正解: <span id="aWrong">0</span></span><br>
-    <span>B 正解: <span id="bCorrect">0</span></span>
-    <span>B 不正解: <span id="bWrong">0</span></span><br>
-    <span>COM 正解: <span id="comCorrect">0</span></span>
-    <span>COM 不正解: <span id="comWrong">0</span></span>
-  </div>
+  <!-- モバイル用の大きなAボタン（JSで表示制御） -->
+  <button id="mobileBuzzer" class="mobile-buzzer" onclick="buzz('A')" aria-label="A早押しボタン"></button>
 
   <!-- ライブラリ -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 
   <script>
     let questions = [];
     let currentIndex = -1;
     let turn = null;
-    let scores = { 
-      A: { correct: 0, wrong: 0 }, 
-      B: { correct: 0, wrong: 0 },
-      COM: { correct: 0, wrong: 0 }
-    };
+    let scores = { A: { correct: 0, wrong: 0 }, B: { correct: 0, wrong: 0 }, COM: { correct: 0, wrong: 0 } };
     let typingTimer = null;
     let typingStopped = false;
     let comTimer = null;
     let isCOM = false;
-    let scoreCOM = { correct: 0, wrong: 0 };
+    let usedIndices = [];
 
     function toggleCOM() {
       isCOM = document.getElementById("comCheckbox").checked;
     }
 
-    // Excel読み込み
     function uploadExcel() {
       const file = document.getElementById("excelUpload").files[0];
-      if (!file) { alert("ファイルを選択してください"); return; }
+      if (!file) return alert("ファイルを選択してください");
       const reader = new FileReader();
       reader.onload = function(e) {
         const data = new Uint8Array(e.target.result);
@@ -104,74 +187,21 @@
       reader.readAsArrayBuffer(file);
     }
 
-    // スプレッドシートCSV読み込み
-    async function loadFromSpreadsheet(url) {
-      try {
-        // シートID抽出
-        const match = url.match(/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
-        if (!match) {
-          alert("有効なスプレッドシートURLを入力してください");
-          return;
-        }
-        const sheetId = match[1];
-
-        // gid からシート名を取得するのは難しいので、とりあえず最初のシートを読み込む
-        // Google Sheets CSVエクスポートURL
-        const csvUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:csv`;
-
-        const response = await fetch(csvUrl);
-        const text = await response.text();
-
-        // 区切り文字を自動判定
-        let delimiter = ",";
-        if (text.includes("\t")) {
-          delimiter = "\t";
-        } else if (text.includes(";")) {
-          delimiter = ";";
-        }
-
-        const rows = text.trim().split("\n").map(line => line.split(delimiter));
-        questions = rows.slice(1).map(r => ({q: r[0], a: r[1]}));
-        alert("スプレッドシートから問題を読み込みました！");
-
-      } catch (e) {
-        console.error(e);
-        alert("スプレッドシートの読み込みに失敗しました");
-      }
-    }
-
-let usedIndices = []; // 出題済みのインデックス記録
-
     function nextQuestion() {
-      if (questions.length === 0) { 
-        alert("問題が読み込まれていません"); 
-        return; 
-      }
-
+      if (questions.length === 0) return alert("問題が読み込まれていません");
       const randomMode = document.getElementById("randomMode").checked;
 
       if (randomMode) {
-        // ランダムモード
-        if (usedIndices.length >= questions.length) {
-          alert("すべての問題が終了しました");
-          return;
-        }
+        if (usedIndices.length >= questions.length) return alert("すべての問題が終了しました");
         let idx;
-        do {
-          idx = Math.floor(Math.random() * questions.length);
-        } while (usedIndices.includes(idx));
+        do { idx = Math.floor(Math.random() * questions.length); } while (usedIndices.includes(idx));
         usedIndices.push(idx);
         currentIndex = idx;
       } else {
-        // 通常モード
         currentIndex++;
-        if (currentIndex >= questions.length) {
-          alert("すべての問題が終了しました");
-          return;
-        }
+        if (currentIndex >= questions.length) return alert("すべての問題が終了しました");
       }
 
-      // 出題処理（共通部分）
       document.getElementById("questionBox").value = "";
       document.getElementById("answerBox").value = "";
       document.getElementById("comResultBox").value = "";
@@ -181,14 +211,11 @@ let usedIndices = []; // 出題済みのインデックス記録
       clearTimeout(comTimer);
       typeWriter(questions[currentIndex].q, "questionBox", 0);
 
-      // COM処理はそのまま
       if (isCOM) {
         const qLength = questions[currentIndex].q.length;
         const displayTime = qLength * 100;
         const rand1 = Math.random();
-        if (rand1 < 0.2) {
-          console.log("COMはこの問題では押しません");
-        } else {
+        if (rand1 >= 0.2) {
           const randomDelay = Math.floor(displayTime * rand1);
           comTimer = setTimeout(() => {
             if (!turn && currentIndex >= 0) {
@@ -212,7 +239,6 @@ let usedIndices = []; // 出題済みのインデックス記録
       }
     }
 
-    // タイピング風表示
     function typeWriter(text, elementId, i) {
       if (typingStopped) return;
       if (i < text.length) {
@@ -221,23 +247,17 @@ let usedIndices = []; // 出題済みのインデックス記録
       }
     }
 
-    // 早押し
-    // 早押し
     function buzz(player) {
       if (!turn) {
         turn = player;
         typingStopped = true;
         clearTimeout(typingTimer);
         clearTimeout(comTimer);
-        document.getElementById("questionBox").value += `/`;
-
-        // 押した人を表示
-        document.getElementById("buzzResultBox").value = player + " が押しました！";
+        document.getElementById("questionBox").value += "/";
+        document.getElementById("buzzResultBox").value = `${player} が押しました！`;
       }
     }
 
-
-    // 答え表示
     function showAnswer() {
       if (currentIndex >= 0) {
         document.getElementById("answerBox").value = questions[currentIndex].a;
@@ -245,7 +265,6 @@ let usedIndices = []; // 出題済みのインデックス記録
       }
     }
 
-    // 正解
     function markCorrect() {
       if (!turn) return;
       scores[turn].correct++;
@@ -254,7 +273,6 @@ let usedIndices = []; // 出題済みのインデックス記録
       setTimeout(() => nextQuestion(), 500);
     }
 
-    // 不正解
     function markWrong() {
       if (!turn) return;
       scores[turn].wrong++;
@@ -263,55 +281,57 @@ let usedIndices = []; // 出題済みのインデックス記録
       setTimeout(() => nextQuestion(), 500);
     }
 
-    // スコア表示更新
     function updateScore(player, isCorrect) {
-      if (player === "A") {
-        if (isCorrect) scoreA.correct++; else scoreA.wrong++;
-        document.getElementById("aCorrect").innerText = scoreA.correct;
-        document.getElementById("aWrong").innerText = scoreA.wrong;
-      } else if (player === "B") {
-        if (isCorrect) scoreB.correct++; else scoreB.wrong++;
-        document.getElementById("bCorrect").innerText = scoreB.correct;
-        document.getElementById("bWrong").innerText = scoreB.wrong;
-      } else if (player === "COM") { // 👈 追加
-        if (isCorrect) scoreCOM.correct++; else scoreCOM.wrong++;
-        document.getElementById("comCorrect").innerText = scoreCOM.correct;
-        document.getElementById("comWrong").innerText = scoreCOM.wrong;
-      }
+      if (isCorrect) scores[player].correct++;
+      else scores[player].wrong++;
+      updateScores();
     }
 
+    function updateScores() {
+      document.getElementById("aCorrect").innerText = scores.A.correct;
+      document.getElementById("aWrong").innerText = scores.A.wrong;
+      document.getElementById("bCorrect").innerText = scores.B.correct;
+      document.getElementById("bWrong").innerText = scores.B.wrong;
+      document.getElementById("comCorrect").innerText = scores.COM.correct;
+      document.getElementById("comWrong").innerText = scores.COM.wrong;
+    }
 
-    // スコアリセット
     function resetScores() {
       scores = { A: { correct: 0, wrong: 0 }, B: { correct: 0, wrong: 0 }, COM: { correct: 0, wrong: 0 } };
       updateScores();
     }
-    document.addEventListener("keydown", (e) => {
-  switch (e.key) {
-    case "q": // 出題
-      nextQuestion();
-      break;
-    case "f": // A早押し
-      buzz("A");
-      break;
-    case "j": // B早押し
-      buzz("B");
-      break;
-    case "a": // 答え表示
-      showAnswer();
-      break;
-    case "z": // 正解
-      markCorrect();
-      break;
-    case "x": // 不正解
-      markWrong();
-      break;
-    case "r": // スコアリセット
-      resetScores();
-      break;
-  }
-});
 
+    // --- モバイル早押しの表示制御 ---
+    function toggleMobileBuzzerVisibility() {
+      const cb = document.getElementById("mobileBuzzerCheckbox");
+      const btn = document.getElementById("mobileBuzzer");
+      // 表示条件: チェックがON かつ（画面幅がスマホ想定以下）
+      if (cb.checked && window.innerWidth <= 768) {
+        btn.style.display = "block";
+      } else {
+        btn.style.display = "none";
+      }
+    }
+
+    // 画面リサイズ時にも表示状態を切り替える
+    window.addEventListener("resize", toggleMobileBuzzerVisibility);
+    document.addEventListener("DOMContentLoaded", () => {
+      // 初期状態反映
+      toggleMobileBuzzerVisibility();
+    });
+
+    // キーボード操作
+    document.addEventListener("keydown", e => {
+      switch (e.key) {
+        case "q": nextQuestion(); break;
+        case "f": buzz("A"); break;
+        case "j": buzz("B"); break;
+        case "a": showAnswer(); break;
+        case "z": markCorrect(); break;
+        case "x": markWrong(); break;
+        case "r": resetScores(); break;
+      }
+    });
   </script>
 </body>
 </html>
